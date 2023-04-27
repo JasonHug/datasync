@@ -39,4 +39,6 @@ public class ParameterConstant {
     public static final String IS_SEND_OFFSET = "is.send.offset";
     public static final String SEND_OFFSET_URL = "send.offset.url";
 
+    public static final String WINDOW_TIME_SECONDS = "window.time.seconds";
+
 }

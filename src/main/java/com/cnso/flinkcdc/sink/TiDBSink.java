@@ -43,6 +43,7 @@ import static com.cnso.flinkcdc.common.constant.ParameterConstant.SINK_TIDB_PASS
 import static com.cnso.flinkcdc.common.constant.ParameterConstant.SINK_TIDB_URL;
 import static com.cnso.flinkcdc.common.constant.ParameterConstant.SINK_TIDB_USERNAME;
 
+@Deprecated
 public class TiDBSink extends RichSinkFunction<Iterable<String>> {
 
     private final static Logger logger = LoggerFactory.getLogger(TiDBSink.class);

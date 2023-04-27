@@ -3,7 +3,6 @@ package com.cnso.flinkcdc;
 import com.cnso.flinkcdc.deserialization.KafkaDeserialization;
 import com.cnso.flinkcdc.sink.TiDBSink;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
-import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.api.java.utils.ParameterTool;
 import org.apache.flink.connector.kafka.source.KafkaSource;
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;

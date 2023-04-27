@@ -88,6 +88,10 @@ public class BinlogData {
      */
     String type;
 
+    String zzId;
+
+    String pkId;
+
     public List<Map<String, Object>> getData() {
         return data;
     }
@@ -190,5 +194,21 @@ public class BinlogData {
 
     public void setType(String type) {
         this.type = type;
+    }
+
+    public String getZzId() {
+        return zzId;
+    }
+
+    public void setZzId(String zzId) {
+        this.zzId = zzId;
+    }
+
+    public String getPkId() {
+        return pkId;
+    }
+
+    public void setPkId(String pkId) {
+        this.pkId = pkId;
     }
 }
