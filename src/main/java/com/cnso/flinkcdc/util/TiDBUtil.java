@@ -5,11 +5,6 @@ import org.apache.commons.dbcp2.BasicDataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
 
-import static com.cnso.flinkcdc.common.constant.ParameterConstant.SINK_TIDB_DRIVER;
-import static com.cnso.flinkcdc.common.constant.ParameterConstant.SINK_TIDB_PASSWORD;
-import static com.cnso.flinkcdc.common.constant.ParameterConstant.SINK_TIDB_URL;
-import static com.cnso.flinkcdc.common.constant.ParameterConstant.SINK_TIDB_USERNAME;
-
 public class TiDBUtil {
 
     private static BasicDataSource dataSource = null;

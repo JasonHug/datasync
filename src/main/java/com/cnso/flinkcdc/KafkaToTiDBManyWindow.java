@@ -11,6 +11,7 @@ import com.cnso.flinkcdc.sink.SyncDataToTidbSink;
 import com.cnso.flinkcdc.util.TiDBUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
+import org.apache.flink.api.common.functions.RichFilterFunction;
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.utils.ParameterTool;
@@ -53,11 +54,11 @@ public class KafkaToTiDBManyWindow {
 
     public static void main(String[] args) throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        ParameterTool config = ParameterTool.fromArgs(args);
+        String cpDir = config.get(FLINK_CHECKPOINT_DIR);
 
         // env.setParallelism(3);
 
-        ParameterTool config = ParameterTool.fromArgs(args);
-        String cpDir = config.get(FLINK_CHECKPOINT_DIR);
 
         //窗口的时间大小
         String windowTimeSeconds = config.get(ParameterConstant.WINDOW_TIME_SECONDS);
@@ -67,12 +68,11 @@ public class KafkaToTiDBManyWindow {
             times = new Long(windowTimeSeconds);
         }
 
-        env.enableCheckpointing(120000L);
+        env.enableCheckpointing(120000L, CheckpointingMode.EXACTLY_ONCE);
         env.setStateBackend(new HashMapStateBackend());
         env.disableOperatorChaining();
 
         CheckpointConfig checkpointConfig = env.getCheckpointConfig();
-        checkpointConfig.setCheckpointingMode(CheckpointingMode.EXACTLY_ONCE);
         checkpointConfig.setCheckpointTimeout(600000L);
         checkpointConfig.setMinPauseBetweenCheckpoints(120000L);
         checkpointConfig.setTolerableCheckpointFailureNumber(9999);
@@ -80,6 +80,7 @@ public class KafkaToTiDBManyWindow {
         checkpointConfig.setExternalizedCheckpointCleanup(CheckpointConfig.ExternalizedCheckpointCleanup.RETAIN_ON_CANCELLATION);
         checkpointConfig.setCheckpointStorage(new FileSystemCheckpointStorage(cpDir));
 
+        // kafka的配置
         String bootstrapServers = config.get(SOURCE_KAFKA_BOOTSTRAP_SERVERS);
         String topics = config.get(SOURCE_KAFKA_TOPICS);
         List<String> topicList = Arrays.stream(topics.split(",")).collect(Collectors.toList());
@@ -87,6 +88,8 @@ public class KafkaToTiDBManyWindow {
         String user = config.get(SOURCE_KAFKA_USERNAME);
         String pwd = config.get(SOURCE_KAFKA_PASSWORD);
         String jaasConfig = String.format(saslJaasConfig, user, pwd);
+        String filterTopics = config.get(ParameterConstant.FILTER_KAFKA_TOPICS);
+
         KafkaSource<String> source = KafkaSource.<String>builder()
                 .setBootstrapServers(bootstrapServers)
                 .setTopics(topicList)
@@ -109,15 +112,6 @@ public class KafkaToTiDBManyWindow {
 
         DataStreamSource<String> kafkaSource = env.fromSource(source, WatermarkStrategy.noWatermarks(), "kafka-tidb");
 
-        // kafkaSource.print();
-
-        /*SingleOutputStreamOperator<Iterable<String>> toSinkStream = kafkaSource.windowAll(TumblingProcessingTimeWindows.of(Time.seconds(3)))
-                .apply(new AllWindowFunction<String, Iterable<String>, TimeWindow>() {
-                    @Override
-                    public void apply(TimeWindow timeWindow, Iterable<String> iterable, Collector<Iterable<String>> collector) throws Exception {
-                        collector.collect(iterable);
-                    }
-                });*/
         kafkaSource.map(new RichMapFunction<String, String>() {
 
             @Override
@@ -134,16 +128,33 @@ public class KafkaToTiDBManyWindow {
             @Override
             public void close() throws Exception {
                 logger.info("[close tidb]");
-                //TiDBUtil.close();
-                System.out.println("close db connection");
+            }
+        }).filter(new RichFilterFunction<String>() {
+            @Override
+            public boolean filter(String s) throws Exception {
+                String topic = JSON.parseObject(s, BinlogData.class).getTopic();
+                if(StringUtils.isNotEmpty(filterTopics)){
+                    List<String> collect = Arrays.stream(filterTopics.split(",")).collect(Collectors.toList());
+                    if (null != collect)
+                        return !collect.contains(topic);
+                }
+                return true;
             }
         }).keyBy(new KeySelector<String, String>() {
             @Override
-            public String getKey(String s) throws Exception {
-                BinlogData binlogData = JSON.parseObject(s, BinlogData.class);
-                String key = binlogData.getDatabase() + "&" + binlogData.getTable();
-                ETableRelation currRelation = ETableRelationService.getCurrRelation(key);
-                String groupByKey = currRelation.getDatabaseName()+"&"+currRelation.getNewTableName();
+            public String getKey(String s) {
+                String groupByKey = null;
+                try{
+                    BinlogData binlogData = JSON.parseObject(s, BinlogData.class);
+                    // 库名&表名 库名&表名_1 库名_1&表名_1 作为主键
+                    String key = binlogData.getDatabase() + "&" + binlogData.getTable();
+                    ETableRelation currRelation = ETableRelationService.getCurrRelation(key);
+                    if (null != currRelation) {
+                        groupByKey = currRelation.getDatabaseName()+"&"+currRelation.getNewTableName();
+                    }
+                } catch (Exception e) {
+                    logger.error("[Group By Key Error] msg:{}", s, e);
+                }
                 return groupByKey;
             }
         }).window(TumblingProcessingTimeWindows.of(Time.seconds(times)))

@@ -3,7 +3,7 @@ package com.cnso.flinkcdc.model;
 import java.util.Date;
 
 /**
- * Create by zhengtianhao 2023-04-23 0023 17:44:34
+ * Create by Zyy 2023-04-23 0023 17:44:34
  */
 public class ETableRelation {
     /**
@@ -55,6 +55,11 @@ public class ETableRelation {
      * 描述
      */
     private String remark;
+
+    /**
+     * 创建临时表SQL语句
+     */
+    private String memoryTableSql;
 
     /**
      * 创建时间
@@ -140,6 +145,14 @@ public class ETableRelation {
 
     public String getRemark() {
         return remark;
+    }
+
+    public String getMemoryTableSql() {
+        return memoryTableSql;
+    }
+
+    public void setMemoryTableSql(String memoryTableSql) {
+        this.memoryTableSql = memoryTableSql;
     }
 
     public void setRemark(String remark) {

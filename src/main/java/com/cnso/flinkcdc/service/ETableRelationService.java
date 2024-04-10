@@ -2,7 +2,7 @@ package com.cnso.flinkcdc.service;
 
 import com.alibaba.fastjson2.JSON;
 import com.cnso.flinkcdc.model.ETableRelation;
-import com.cnso.flinkcdc.process.ZzResultProcess;
+import com.cnso.flinkcdc.util.ETableRelationUtils;
 import com.cnso.flinkcdc.util.TableUtils;
 import com.cnso.flinkcdc.util.TiDBUtil;
 import org.apache.commons.collections.CollectionUtils;
@@ -15,24 +15,39 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 /**
- * Create by zhengtianhao 2023-04-23 0023 19:09:06
+ * Create by Zyy 2023-04-23 0023 19:09:06
+ *
+ * CREATE TABLE `e_table_relation` (
+ * id bigint(0) AUTO_INCREMENT COMMENT '主键',
+ * database_name varchar(100) NOT NULL COMMENT '数据库名称',
+ * table_name varchar(100) NOT NULL COMMENT 'qxb表名称/前缀 如果有分表 则为表名称前缀',
+ * new_table_name varchar(100) NOT NULL COMMENT '新表名:合并分库分表后的表名称',
+ * has_eid tinyint(0) NOT NULL COMMENT '是否有Eid列1有0无',
+ * json_cont_eid varchar(100) COMMENT 'json中的eid,可以设置多个 列名1:属性a,属性b|列名2:属性aa,属性bb',
+ * lock_keywords varchar(200) COMMENT '多线程锁keywords,多个以逗号隔开',
+ * other_eids varchar(200) COMMENT '列名不是eid 值为eid内容的列名 逗号隔开',
+ * table_type tinyint(0) COMMENT '1单表2分表3分库分表',
+ * remark varchar(200) COMMENT '描述',
+ * memory_table_sql text COMMENT '创建mem表的sql语句',
+ * create text COMMENT '创建mem表的sql语句',
+ * memory_table_sql text COMMENT '创建mem表的sql语句',
+ * create_time datetime,
+ * update_time datetime,
+ * unique key `unique_idx` (database_name, table_name)
+ * )
  */
 public class ETableRelationService {
 
     private final static Logger logger = LoggerFactory.getLogger(ETableRelationService.class);
 
-    private static Map<String, ETableRelation> relationMap = new ConcurrentHashMap<>();
-
-    private static List<ETableRelation> relationList = new ArrayList<>();
-
-    private static void initRelation(){
+    private synchronized static void initRelation() {
         Connection conn = null;
         try {
+            if (CollectionUtils.isNotEmpty(ETableRelationUtils.RELATION_LIST)) return;
+
+            // ETableRelationUtils的数据关系为空，需要初始化
             conn = TiDBUtil.getConn();
             logger.info("[search relation] conn={}", conn);
             StringBuffer sqlBuffer = new StringBuffer();
@@ -40,7 +55,10 @@ public class ETableRelationService {
             sqlBuffer.append("other_eids, table_type from e_table_relation ");
             PreparedStatement ps = conn.prepareStatement(sqlBuffer.toString());
             ResultSet resultSet = ps.executeQuery();
-            while (resultSet.next()){
+
+            // 加载配置表
+            ArrayList<ETableRelation> relations = new ArrayList<>();
+            while (resultSet.next()) {
                 ETableRelation tableRelation = new ETableRelation();
                 tableRelation.setDatabaseName(resultSet.getString("database_name"));
                 tableRelation.setTableName(resultSet.getString("table_name"));
@@ -50,83 +68,108 @@ public class ETableRelationService {
                 tableRelation.setLockKeywords(resultSet.getString("lock_keywords"));
                 tableRelation.setOtherEids(resultSet.getString("other_eids"));
                 tableRelation.setTableType(resultSet.getInt("table_type"));
-                relationList.add(tableRelation);
+                relations.add(tableRelation);
             }
-        }catch (Exception e){
+
+            ETableRelationUtils.initList(relations);
+        } catch (Exception e) {
             logger.error("[query table relations] exception!", e);
-        }finally {
-            if(conn != null){
+        } finally {
+            if (conn != null) {
                 try {
                     conn.close();
                 } catch (SQLException throwables) {
                 }
             }
+            logger.info("[init relation table] Finish Relation_list");
         }
     }
 
     /**
-     *
+     * 库名&表名 库名&表名_1 库名_1&表名_1 作为主键
      * @param key
      * @return
      */
-    public static ETableRelation getCurrRelation(String key){
-        ETableRelation eTableRelation = relationMap.get(key);
-        if (null != eTableRelation){
+    public static ETableRelation getCurrRelation(String key) {
+        // 加载service类的时候已经初始化
+        List<ETableRelation> DBTablesConfig = ETableRelationUtils.RELATION_LIST;
+        // Map初始为空
+        ETableRelation eTableRelation = ETableRelationUtils.RELATION_MAP.get(key);
+
+        if (null != eTableRelation) {
             return eTableRelation;
         }
-        if (relationList == null || relationList.size() == 0){
+
+        if (CollectionUtils.isEmpty(DBTablesConfig)) {
             initRelation();
-            logger.info("[init table relation] finish");
         }
+
         //库名&表名
         String[] split = key.split("\\&");
-        if (split.length != 2){
+        if (split.length != 2) {
             logger.error("[explain data KEY] exception-key:{}", key);
-            throw new RuntimeException("[explain KEY] exception-key:"+key);
+            throw new RuntimeException("[explain KEY] exception-key:" + key);
         }
+
         String dbName = split[0];
         String tableName = split[1];
         logger.info("[get table relations] dbName={}, tableName={}", dbName, tableName);
-        if (CollectionUtils.isNotEmpty(relationList)){
-            //单表
-            List<ETableRelation> collect = relationList.stream().filter(item ->
-                    item.getTableType() == 1
-                            && tableName.equals(item.getTableName())
-                            && dbName.equals(item.getDatabaseName())).collect(Collectors.toList());
-            //分表
-            if (CollectionUtils.isEmpty(collect)){
-                collect = relationList.stream().filter(item ->
-                        item.getTableType() == 2
-                                && tableName.startsWith(item.getTableName())
-                                && dbName.equals(item.getDatabaseName())).collect(Collectors.toList());
-            }
 
-            //分库分表
-            if (CollectionUtils.isEmpty(collect)){
-                collect = relationList.stream().filter(item ->
-                        item.getTableType() == 3
-                                && tableName.startsWith(item.getTableName())
-                                && dbName.startsWith(item.getDatabaseName())).collect(Collectors.toList());
+        // 将本次窗口涉及到的 库&表 都放进来
+        ArrayList<ETableRelation> collect = new ArrayList<>();
+        // 单表
+        for (int i = 0; i < DBTablesConfig.size(); i++) {
+            ETableRelation item = DBTablesConfig.get(i);
+            if (null == item)
+                logger.info("[Error], {}, {}", JSON.toJSONString(DBTablesConfig), DBTablesConfig.size());
 
-            }
-            if (CollectionUtils.isNotEmpty(collect)){
-                if (collect.size() == 1){
-                    eTableRelation = collect.get(0);
-                }else {
-                    double si = 0.0;
-                    for (ETableRelation tableRelation : collect) {
-                        double name = TableUtils.findNameSimilarity(tableRelation.getTableName(), tableName);
-                        double table = TableUtils.findNameSimilarity(tableRelation.getDatabaseName(), dbName);
-                        if (si < (name+table)){
-                            eTableRelation = tableRelation;
-                        }
-                    }
-                }
-            }
-            if (null != eTableRelation){
-                relationMap.put(key, eTableRelation);
+            if (item.getTableType() == 1 && tableName.equals(item.getTableName()) && dbName.equals(item.getDatabaseName()))
+                collect.add(item);
+        }
+
+        // 分表
+        if (CollectionUtils.isEmpty(collect)) {
+            for (int i = 0; i < DBTablesConfig.size(); i++) {
+                ETableRelation item = DBTablesConfig.get(i);
+                if (null == item)
+                    logger.info("[Error], {}", JSON.toJSONString(DBTablesConfig));
+
+                if (item.getTableType() == 2 && tableName.equals(item.getTableName()) && dbName.equals(item.getDatabaseName()))
+                    collect.add(item);
             }
         }
+
+        // 分库分表
+        if (CollectionUtils.isEmpty(collect)) {
+            for (int i = 0; i < DBTablesConfig.size(); i++) {
+                ETableRelation item = DBTablesConfig.get(i);
+                if (null == item)
+                    logger.info("[Error], {}", JSON.toJSONString(DBTablesConfig));
+
+                if (item.getTableType() == 3 && tableName.equals(item.getTableName()) && dbName.equals(item.getDatabaseName()))
+                    collect.add(item);
+            }
+        }
+
+        if (CollectionUtils.isNotEmpty(collect)) {
+            if (collect.size() == 1) {
+                eTableRelation = collect.get(0);
+            } else {
+                // 相似算法判断分库分表
+                double si = 0.0;
+                for (ETableRelation tableRelation :
+                        collect) {
+                    double db = TableUtils.findNameSimilarity(tableRelation.getDatabaseName(), dbName);
+                    double table = TableUtils.findNameSimilarity(tableRelation.getTableName(), tableName);
+                    if (si < (table + db))
+                        eTableRelation = tableRelation;
+                }
+            }
+        }
+
+        if (null != eTableRelation)
+            ETableRelationUtils.RELATION_MAP.put(key, eTableRelation);
+
         logger.info("[table relations] eTableRelation={}", eTableRelation);
         return eTableRelation;
     }

@@ -29,6 +29,8 @@ public class BinlogData {
 
     Long offset;
 
+    private int random;
+
     /**
      * 修改数据
      */
@@ -118,6 +120,14 @@ public class BinlogData {
 
     public Long getId() {
         return id;
+    }
+
+    public int getRandom() {
+        return random;
+    }
+
+    public void setRandom(int random) {
+        this.random = random;
     }
 
     public void setId(Long id) {

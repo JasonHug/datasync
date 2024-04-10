@@ -40,5 +40,6 @@ public class ParameterConstant {
     public static final String SEND_OFFSET_URL = "send.offset.url";
 
     public static final String WINDOW_TIME_SECONDS = "window.time.seconds";
+    public static final String FILTER_KAFKA_TOPICS = "filter.kafka.topics";
 
 }

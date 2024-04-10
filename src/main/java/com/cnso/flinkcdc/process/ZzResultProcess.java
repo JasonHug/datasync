@@ -7,8 +7,6 @@ import com.cnso.flinkcdc.model.ETableRelation;
 import com.cnso.flinkcdc.model.ProcessResult;
 import com.cnso.flinkcdc.service.ETableRelationService;
 import com.cnso.flinkcdc.util.BinlogDataUtils;
-import com.cnso.flinkcdc.util.TableUtils;
-import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.util.Collector;
@@ -22,7 +20,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Create by zhengtianhao 2023-04-23 0023 16:14:29
+ * Create by Zyy 2023-04-23 0023 16:14:29
  */
 public class ZzResultProcess extends ProcessWindowFunction<String, ProcessResult, String, TimeWindow> {
 
@@ -36,7 +34,9 @@ public class ZzResultProcess extends ProcessWindowFunction<String, ProcessResult
 
         //获取表关系
         ETableRelation currRelation = ETableRelationService.getCurrRelation(key);
+        if (null == currRelation) throw new RuntimeException("[Not Found Relation] key: " + key);
         logger.info("[table relation] Relation={}", JSON.toJSONString(currRelation));
+
         //解析binlog数据
         for (String tmp : iterable) {
             BinlogDataUtils.rebuild(tmp, dataList);
