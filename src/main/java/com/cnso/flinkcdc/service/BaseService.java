@@ -119,6 +119,54 @@ public abstract class BaseService {
     }
 
     /**
+     * 使用内存表更新
+     * @param tableRelation
+     * @param list
+     * @param conn
+     */
+    public int batchInsertOrUpdate(ETableRelation tableRelation, List<BinlogData> list, Connection conn) throws Exception{
+        PreparedStatement insertPs = null;
+        Statement updateStatement = null;
+        try {
+            StringBuffer sqlBuf = new StringBuffer();
+            String memTable = tableRelation.getNewTableName() + "_memory";
+            initInsertTmpSql(sqlBuf, memTable);
+            insertPs = conn.prepareStatement(sqlBuf.toString());
+            for (int i = 0; i < list.size(); i++){
+                BinlogData binlogData = list.get(i);
+                List<Map<String, Object>> data = binlogData.getData();
+                for (Map<String, Object> datum: data) {
+                    System.out.println("[update sql] sql=" + datum);
+                    initPs(insertPs, datum);
+                    insertPs.addBatch();
+                }
+            }
+            insertPs.executeBatch();
+
+            // 内存表更新数据
+            StringBuffer sqlBuffer = new StringBuffer();
+            sqlBuffer.append(" replace into ").append(tableRelation.getNewTableName()).append(" ");
+            sqlBuffer.append("select tmp.* from").append(memTable).append(" tmp ");
+            updateStatement = conn.createStatement();
+            return updateStatement.executeUpdate(sqlBuffer.toString());
+        }finally {
+            if(insertPs!=null)
+                insertPs.close();
+            if(updateStatement!=null)
+                updateStatement.close();
+        }
+    }
+
+    /**
+     * 初始化插入临时表语句
+     * @param sqlBuf
+     * @param memTable
+     */
+    private void initInsertTmpSql(StringBuffer sqlBuf, String memTable) {
+        throw new NotImplementedException();
+    }
+
+    /**
      * 批量插入到临时表里
      * @param list
      */

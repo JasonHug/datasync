@@ -56,12 +56,9 @@ public class KafkaToTiDBManyWindow {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         ParameterTool config = ParameterTool.fromArgs(args);
         String cpDir = config.get(FLINK_CHECKPOINT_DIR);
-
-        // env.setParallelism(3);
-
-
         //窗口的时间大小
         String windowTimeSeconds = config.get(ParameterConstant.WINDOW_TIME_SECONDS);
+
         //默认为3秒
         Long times = new Long(3);
         if (StringUtils.isNoneEmpty(windowTimeSeconds)){
@@ -70,6 +67,7 @@ public class KafkaToTiDBManyWindow {
 
         env.enableCheckpointing(120000L, CheckpointingMode.EXACTLY_ONCE);
         env.setStateBackend(new HashMapStateBackend());
+
         env.disableOperatorChaining();
 
         CheckpointConfig checkpointConfig = env.getCheckpointConfig();
@@ -77,13 +75,17 @@ public class KafkaToTiDBManyWindow {
         checkpointConfig.setMinPauseBetweenCheckpoints(120000L);
         checkpointConfig.setTolerableCheckpointFailureNumber(9999);
         checkpointConfig.setMaxConcurrentCheckpoints(3);
+        // ck清理规则
         checkpointConfig.setExternalizedCheckpointCleanup(CheckpointConfig.ExternalizedCheckpointCleanup.RETAIN_ON_CANCELLATION);
         checkpointConfig.setCheckpointStorage(new FileSystemCheckpointStorage(cpDir));
 
         // kafka的配置
         String bootstrapServers = config.get(SOURCE_KAFKA_BOOTSTRAP_SERVERS);
         String topics = config.get(SOURCE_KAFKA_TOPICS);
+
+        // 构造字符列表
         List<String> topicList = Arrays.stream(topics.split(",")).collect(Collectors.toList());
+
         String groupId = config.get(SOURCE_KAFKA_GROUP_ID);
         String user = config.get(SOURCE_KAFKA_USERNAME);
         String pwd = config.get(SOURCE_KAFKA_PASSWORD);
@@ -94,7 +96,7 @@ public class KafkaToTiDBManyWindow {
                 .setBootstrapServers(bootstrapServers)
                 .setTopics(topicList)
                 .setGroupId(groupId)
-                .setStartingOffsets(OffsetsInitializer.earliest())
+                .setStartingOffsets(OffsetsInitializer.latest())
                 // .setStartingOffsets(OffsetsInitializer.timestamp(1677240000000L))
                 .setDeserializer(KafkaRecordDeserializationSchema.of(new KafkaDeserialization()))
                 // .setValueOnlyDeserializer(new SimpleStringSchema())
@@ -112,7 +114,7 @@ public class KafkaToTiDBManyWindow {
 
         DataStreamSource<String> kafkaSource = env.fromSource(source, WatermarkStrategy.noWatermarks(), "kafka-tidb");
 
-        kafkaSource.map(new RichMapFunction<String, String>() {
+        kafkaSource.rescale().map(new RichMapFunction<String, String>() {
 
             @Override
             public String map(String s) throws Exception {

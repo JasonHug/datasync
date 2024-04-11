@@ -91,11 +91,11 @@ public class ETableRelationService {
      * @return
      */
     public static ETableRelation getCurrRelation(String key) {
-        // 加载service类的时候已经初始化
-        List<ETableRelation> DBTablesConfig = ETableRelationUtils.RELATION_LIST;
         // Map初始为空
         ETableRelation eTableRelation = ETableRelationUtils.RELATION_MAP.get(key);
 
+        // 加载service类的时候已经初始化
+        List<ETableRelation> DBTablesConfig = ETableRelationUtils.RELATION_LIST;
         if (null != eTableRelation) {
             return eTableRelation;
         }

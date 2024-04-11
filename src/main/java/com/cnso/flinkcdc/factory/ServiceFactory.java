@@ -189,7 +189,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Create by zhengtianhao 2023-04-24 0024 09:19:05
+ * Create by Zyy 2023-04-24 0024 09:19:05
  */
 public class ServiceFactory {
     private final static Logger log = LoggerFactory.getLogger(ServiceFactory.class);
@@ -197,9 +197,8 @@ public class ServiceFactory {
     public static Map<String, BaseService> SERVICE_MAP = new ConcurrentHashMap<>();
 
     public static BaseService createService(ETableRelation tableRelation){
-        String key = tableRelation.getNewTableName();
-        BaseService service = SERVICE_MAP.get(key);
-        if (ObjectUtils.isEmpty(service)){
+        BaseService service = null;
+        if (null == service){
             //处理任务数据
             switch (tableRelation.getNewTableName()){
                 case "t_whole_park":
@@ -741,10 +740,6 @@ public class ServiceFactory {
                     break;
                 default:
                     log.error("[任务类型异常] 未找到对应的任务类型，任务信息：{}", JSON.toJSONString(tableRelation));
-            }
-
-            if (null != service){
-                SERVICE_MAP.put(key, service);
             }
         }
         return service;

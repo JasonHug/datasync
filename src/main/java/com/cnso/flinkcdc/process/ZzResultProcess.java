@@ -1,5 +1,6 @@
 package com.cnso.flinkcdc.process;
 
+import cn.hutool.core.bean.BeanUtil;
 import com.alibaba.fastjson.JSON;
 import com.cnso.flinkcdc.factory.ServiceFactory;
 import com.cnso.flinkcdc.model.BinlogData;
@@ -22,12 +23,12 @@ import java.util.stream.Collectors;
 /**
  * Create by Zyy 2023-04-23 0023 16:14:29
  */
-public class ZzResultProcess extends ProcessWindowFunction<String, ProcessResult, String, TimeWindow> {
+public class ZzResultProcess extends ProcessWindowFunction<String, List<ProcessResult>, String, TimeWindow> {
 
     Logger logger = LoggerFactory.getLogger(ZzResultProcess.class);
 
     @Override
-    public void process(String key, Context context, Iterable<String> iterable, Collector<ProcessResult> collector) throws Exception{
+    public void process(String key, Context context, Iterable<String> iterable, Collector<List<ProcessResult>> collector) throws Exception{
         logger.info("[start] tableInfo={}",key);
         List<BinlogData> dataList = new ArrayList<>();
         List<BinlogData> filterList = new ArrayList<>();
@@ -59,12 +60,30 @@ public class ZzResultProcess extends ProcessWindowFunction<String, ProcessResult
         }
 
         logger.info("[data] binlog data filter size size ={}", filterList.size());
+        ArrayList<ProcessResult> processResList = new ArrayList<>();
         ProcessResult processResult = splitTask(filterList);
+
         processResult.setService(ServiceFactory.createService(currRelation));
         processResult.setTableName(currRelation.getNewTableName());
         processResult.setTableRelation(currRelation);
+        processResList.add(processResult);
+
+        // 复制条目数
+        if(currRelation.getNewTableName().equals("t_enterprise")) {
+            ProcessResult pr = new ProcessResult();
+            ETableRelation er = new ETableRelation();
+            BeanUtil.copyProperties(processResult, pr, false);
+            BeanUtil.copyProperties(currRelation, er, false);
+
+            er.setNewTableName("m_enterprise");
+            pr.setTableName(er.getNewTableName());
+            pr.setService(ServiceFactory.createService(er));
+            pr.setTableRelation(er);
+            processResList.add(pr);
+        }
+
         logger.info("[res] {}", processResult);
-        collector.collect(processResult);
+        collector.collect(processResList);
     }
 
     private ProcessResult splitTask(List<BinlogData> dataList){
