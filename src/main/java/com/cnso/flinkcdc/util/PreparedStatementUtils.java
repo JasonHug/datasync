@@ -1,10 +1,9 @@
 package com.cnso.flinkcdc.util;
 
+import org.apache.commons.lang3.StringUtils;
+
 import java.math.BigDecimal;
-import java.sql.Date;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
-import java.sql.Types;
+import java.sql.*;
 import java.util.Map;
 
 /**
@@ -120,6 +119,14 @@ public class PreparedStatementUtils {
             preparedStatement.setBigDecimal(parameterIndex,new BigDecimal(x.toString()));
         }else{
             preparedStatement.setNull(parameterIndex, Types.DECIMAL);
+        }
+    }
+
+    public static void setTimestamp(int parameterIndex, Object x, PreparedStatement preparedStatement) throws SQLException {
+        if(x!=null && StringUtils.isNotEmpty(x.toString())) {
+            preparedStatement.setTimestamp(parameterIndex, new Timestamp(TableUtils.getLong(x.toString())));
+        } else {
+            preparedStatement.setNull(parameterIndex, Types.TIMESTAMP);
         }
     }
 }

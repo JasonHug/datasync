@@ -61,7 +61,7 @@ public class BinlogData {
     /**
      * 原数据
      */
-    List<Map<String, String>> old;
+    List<Map<String, Object>> old;
 
     /**
      * 主键列名
@@ -150,11 +150,11 @@ public class BinlogData {
         this.mysqlType = mysqlType;
     }
 
-    public List<Map<String, String>> getOld() {
+    public List<Map<String, Object>> getOld() {
         return old;
     }
 
-    public void setOld(List<Map<String, String>> old) {
+    public void setOld(List<Map<String, Object>> old) {
         this.old = old;
     }
 
