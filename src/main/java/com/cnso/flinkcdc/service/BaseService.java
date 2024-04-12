@@ -3,8 +3,6 @@ package com.cnso.flinkcdc.service;
 import com.cnso.flinkcdc.model.BinlogData;
 import com.cnso.flinkcdc.model.ETableRelation;
 import org.apache.flink.shaded.guava30.com.google.common.collect.Lists;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.sql.Connection;
@@ -28,7 +26,7 @@ public abstract class BaseService {
     public void batchDel(ETableRelation tableRelation, List<BinlogData> dataList, Connection conn) throws Exception  {
 
         //封装需要删除id集合
-        if (tableRelation.getTableType() == 1 && !tableRelation.getTableType().equals("t_report_details")){
+        if (tableRelation.getTableType() == 1 && !tableRelation.getNewTableName().equals("t_report_details")){
             singleTableDel(tableRelation, dataList, conn);
         }else {
             splitTableDel(tableRelation, dataList, conn);
@@ -43,24 +41,24 @@ public abstract class BaseService {
      * @return
      */
     private int singleTableDel(ETableRelation tableRelation, List<BinlogData> dataList, Connection conn) throws Exception {
-        List<Long> ids = new ArrayList<>();
+        List<String> ids = new ArrayList<>();
         String pkName = "id";
         for (BinlogData binlogData : dataList) {
             List<Map<String, Object>> data = binlogData.getData();
-            pkName = binlogData.getPkId();
+            pkName = binlogData.getPkNames().get(0);
             for (Map<String, Object> datum : data) {
-                ids.add(new Long(datum.get("id").toString()));
+                ids.add(datum.get(pkName).toString());
             }
         }
 
-        List<List<Long>> partition = Lists.partition(ids, 1000);
+        List<List<String>> partition = Lists.partition(ids, 1000);
         StringBuffer sqlBuffer = new StringBuffer();
         sqlBuffer.append("DELETE FROM ").append(tableRelation.getNewTableName()).append(" ");
         sqlBuffer.append("WHERE `").append(pkName).append("` IN ");
         String sql = null;
         PreparedStatement ps = null;
         try{
-            for (List<Long> tmpList : partition) {
+            for (List<String> tmpList : partition) {
                 StringBuffer tmpBuffer = new StringBuffer();
                 String idsStr = tmpList.stream().map(item -> {return "'"+item.toString()+"'";}).collect(Collectors.joining(","));
                 tmpBuffer.append("(").append(idsStr).append(")");
@@ -170,11 +168,12 @@ public abstract class BaseService {
      * 批量插入到临时表里
      * @param list
      */
-    public int batchInsertTmp(List<BinlogData> list,Connection conn) throws Exception  {
+    public int batchInsertTmp(ETableRelation tableRelation,List<BinlogData> list,Connection conn) throws Exception  {
         System.out.println("[start insert table tmp]");
         PreparedStatement ps = null;
         StringBuffer sqlBuf = new StringBuffer();
-        initInsertTmpSql(sqlBuf);
+        String tmpTable = tableRelation.getNewTableName() + "_tmp";
+        initInsertTmpSql(sqlBuf, tmpTable);
         try {
             conn.setAutoCommit(false);
             ps = conn.prepareStatement(sqlBuf.toString());
@@ -192,6 +191,8 @@ public abstract class BaseService {
                 }
             }
         }catch (Exception e){
+            System.out.println("[insert tmp error] table: " + tableRelation.getNewTableName()+ "_tmp");
+            System.out.println("[insert tmp error] msg: " + e.getMessage());
             throw e;
         }finally {
             if(ps != null){
@@ -228,10 +229,10 @@ public abstract class BaseService {
     public int batchUpdateFromTmp(String tableName,Connection conn) throws Exception  {
         StringBuffer sqlBuffer = new StringBuffer();
         sqlBuffer.append(" replace into ").append(tableName).append(" ");
-        sqlBuffer.append("select ");;
+        sqlBuffer.append("select ");
         sqlBuffer.append("    tmp.* ");
         sqlBuffer.append("from ").append(tableName).append("_tmp tmp ");
-        System.out.println("[replace into sql] sql:"+sqlBuffer.toString());
+//        System.out.println("[replace into sql] sql:"+sqlBuffer.toString());
         Statement ps = null;
         try {
             ps =  conn.createStatement();

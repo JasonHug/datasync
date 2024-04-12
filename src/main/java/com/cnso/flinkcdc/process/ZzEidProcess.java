@@ -1,5 +1,8 @@
 package com.cnso.flinkcdc.process;
 
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.JSONException;
 import com.cnso.flinkcdc.model.BinlogData;
 import com.cnso.flinkcdc.model.ETableRelation;
 import com.cnso.flinkcdc.util.EIdUtils;
@@ -67,7 +70,10 @@ public class ZzEidProcess {
             for (Map<String, Object> map : data) {
                 //解析其它eid
                 String eid = ObjectUtils.isEmpty(map.get("eid")) ? null : map.get("eid").toString();
-                map.put("zz_eid", EIdUtils.generateEid(eid));
+                if (StringUtils.isEmpty(eid))
+                    map.put("zz_eid", "");
+                else
+                    map.put("zz_eid", EIdUtils.generateEid(eid));
             }
         }
     }
@@ -105,9 +111,7 @@ public class ZzEidProcess {
                     if (CollectionUtils.isNotEmpty(data)){
                         for (Map<String, Object> datum : data) {
                             String eid = ObjectUtils.isNotEmpty(datum.get(column)) ? datum.get(column).toString() : null;
-                            if (StringUtils.isEmpty(eid)){
-                                datum.put("zz_"+column, null == eid ? "" : EIdUtils.generateEid(eid));
-                            }
+                            datum.put("zz_"+column, StringUtils.isEmpty(eid) ? "" : EIdUtils.generateEid(eid));
                         }
                     }
                 }
@@ -135,12 +139,36 @@ public class ZzEidProcess {
                         for (Map<String, Object> datum : data) {
                             if (ObjectUtils.isNotEmpty(datum.get(cName)) && StringUtils.isNotEmpty(datum.get(cName).toString())){
                                 //解析eid
-                                datum.put(cName, EIdUtils.generateEid(datum.get(cName).toString()));
+                                datum.put(cName, processJsonContent(datum.get(cName), key));
                             }
                         }
                     }
                 }
             }
+        }
+    }
+
+    private String processJsonContent(Object jsonCont, String eidKey) {
+        String newCont = jsonCont.toString();
+        try {
+            JSONArray objects = JSON.parseArray(jsonCont.toString());
+            Map<String, Object> item = null;
+            for (Object object : objects) {
+                item = (Map<String, Object>) object;
+                if (ObjectUtils.isNotEmpty(item.get(eidKey))){
+                    String eid = item.get(eidKey).toString();
+                    if (StringUtils.isNotEmpty(eid)) {
+                        item.put(eidKey, EIdUtils.generateEid(eid));
+                    } else {
+                        item.put(eidKey, "");
+                    }
+                }
+            }
+            newCont = objects.toString();
+        } catch (JSONException e) {
+            e.printStackTrace();
+        } finally {
+            return newCont;
         }
     }
 }

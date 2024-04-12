@@ -5,20 +5,15 @@ import com.cnso.flinkcdc.service.BaseService;
 import java.util.List;
 
 /**
- * Create by zhengtianhao 2023-04-23 0023 16:43:38
+ * Create by Zyy 2023-04-23 0023 16:43:38
  */
 public class ProcessResult {
 
     List<BinlogData> delList;
-
     List<BinlogData> insertList;
-
     List<BinlogData> updateList;
-
     String tableName;
-
     BaseService service;
-
     ETableRelation tableRelation;
 
     public List<BinlogData> getDelList() {

@@ -45,7 +45,7 @@ public class ZzIdProcess {
                 if (tableRelation.getNewTableName().equals(new String("szse_eid_pname_pid")) ||
                         tableRelation.getNewTableName().equals(new String("szse_pid_relation"))){
                     for (Map<String, Object> map : dataList) {
-                        zzId = dbSuffix+"_"+tableSuffix+"_"+ StringUtils.leftPad(map.get("zz_eid").toString(), 32, "0");
+                        zzId = dbSuffix+"_"+tableSuffix+"_"+ StringUtils.leftPad(map.get("id").toString(), 32, "0");
                         putId(map,"zz_id", zzId);
                     }
                 } else if (tableRelation.getNewTableName().equals(new String("t_article_enterprise")) ||
