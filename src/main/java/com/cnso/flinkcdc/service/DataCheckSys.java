@@ -489,7 +489,7 @@ public class DataCheckSys {
 
 
     // 初始化数据源
-    private static void initDs() throws IOException {
+    public static void initDs() throws IOException {
         Properties prop = loadProp();
         DsTidb = MysqlTypeDbUtil.init(MYSQL_DRIVER, prop.getProperty(DB_URL_TIDB), prop.getProperty(DB_USER_TIDB), prop.getProperty(DB_PWD_TIDB));
         Ds201 = MysqlTypeDbUtil.init(MYSQL_DRIVER, prop.getProperty(DB_URL_201), prop.getProperty(DB_USER_201), prop.getProperty(DB_PWD_201));
